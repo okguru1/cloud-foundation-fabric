@@ -62,6 +62,7 @@ module "ext_lb" {
   name                = "ext-lb"
   project_id          = module.project.project_id
   protocol            = "HTTPS"
+  address             = var.ext_lb_config.address
   use_classic_version = false
   backend_service_configs = {
     default = {
@@ -88,6 +89,7 @@ module "int_lb" {
   project_id = module.project.project_id
   region     = each.key
   protocol   = "HTTPS"
+  address    = var.int_lb_config.addresses[each.key]
   backend_service_configs = {
     default = {
       backends = [{
@@ -105,12 +107,22 @@ module "int_lb" {
   }
 }
 
+module "certificate_manager" {
+  count              = length(local.int_cross_region_instances) > 0 ? 1 : 0
+  source             = "../../../modules/certificate-manager"
+  project_id         = module.project.project_id
+  certificates       = var.int_cross_region_lb_config.certificate_manager_config.certificates
+  dns_authorizations = var.int_cross_region_lb_config.certificate_manager_config.dns_authorizations
+  issuance_configs   = var.int_cross_region_lb_config.certificate_manager_config.issuance_configs
+}
+
 module "int_cross_region_lb" {
   count      = length(local.int_cross_region_instances) > 0 ? 1 : 0
   source     = "../../../modules/net-lb-app-int-cross-region"
   name       = "int-cross-region-lb"
   project_id = module.project.project_id
   protocol   = "HTTPS"
+  addresses  = var.int_cross_region_lb_config.addresses
   backend_service_configs = {
     default = {
       backends = [for k, v in google_compute_region_network_endpoint_group.psc_negs : {
@@ -122,7 +134,9 @@ module "int_cross_region_lb" {
     }
   }
   https_proxy_config = {
-    certificate_manager_certificates = var.int_cross_region_lb_config.certificate_manager_certificates
+    certificate_manager_certificates = (var.int_cross_region_lb_config == null ? 
+    null : 
+    values(module.certificate_manager[0].certificate_ids))
   }
   vpc_config = {
     network     = local.network
