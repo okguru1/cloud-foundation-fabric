@@ -43,6 +43,9 @@ resource "google_container_cluster" "cluster" {
   remove_default_node_pool                 = var.default_nodepool.remove_pool
   deletion_protection                      = var.deletion_protection
   enable_cilium_clusterwide_network_policy = var.enable_features.cilium_clusterwide_network_policy
+  default_snat_status {
+    disabled = var.disable_default_snat
+  }
   datapath_provider = (
     var.enable_features.dataplane_v2
     ? "ADVANCED_DATAPATH"
